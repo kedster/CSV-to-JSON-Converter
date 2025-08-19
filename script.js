@@ -1,15 +1,18 @@
 // Function to parse CSV to JSON
 function csvToJson(csv) {
-    const lines = csv.trim().split('\n');
-    if (lines.length < 1) throw new Error('CSV is empty.');
+    if (!csv || !csv.trim()) throw new Error('CSV is empty.');
 
-    // Parse headers
-    const headers = lines[0].split(',').map(header => header.trim());
+    // Normalize newlines and split into lines
+    const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(line => line.trim() !== '');
+    if (lines.length < 1) throw new Error('CSV has no data.');
 
-    // Parse rows
+    // Parse headers (support quoted headers)
+    const headers = parseCsvLine(lines[0]);
+    if (headers.length === 0) throw new Error('No headers found in CSV.');
+
     const result = [];
     for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.trim().replace(/^"|"$/g, ''));
+        const row = parseCsvLine(lines[i]);
         if (row.length !== headers.length) {
             throw new Error(`Invalid CSV format at line ${i + 1}. Expected ${headers.length} columns, got ${row.length}.`);
         }
@@ -20,6 +23,33 @@ function csvToJson(csv) {
         result.push(obj);
     }
     return result;
+}
+
+// Parse a single CSV line, handling quoted values and commas inside quotes
+function parseCsvLine(line) {
+    const values = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            // If it's a double quote inside a quoted field followed by another double quote, it's an escaped quote
+            if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+                cur += '"';
+                i++; // skip next quote
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch === ',' && !inQuotes) {
+            values.push(cur.trim());
+            cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    values.push(cur.trim());
+    // Remove surrounding quotes if present
+    return values.map(v => v.replace(/^"|"$/g, ''));
 }
 
 // Handle form submission
@@ -33,6 +63,7 @@ document.getElementById('csvForm').addEventListener('submit', async (e) => {
     const errorDiv = document.getElementById('error');
     const downloadBtn = document.getElementById('downloadBtn');
     const copyBtn = document.getElementById('copyBtn');
+    const statusMsg = document.getElementById('statusMsg');
 
     // Reset UI
     resultDiv.classList.add('hidden');
@@ -62,6 +93,7 @@ document.getElementById('csvForm').addEventListener('submit', async (e) => {
         // Display JSON
         jsonOutput.textContent = jsonString;
         resultDiv.classList.remove('hidden');
+        if (statusMsg) statusMsg.textContent = `Converted ${jsonData.length} rows.`;
 
         // Setup download button
         downloadBtn.onclick = () => {
@@ -70,16 +102,20 @@ document.getElementById('csvForm').addEventListener('submit', async (e) => {
             const a = document.createElement('a');
             a.href = url;
             a.download = 'output.json';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            if (statusMsg) statusMsg.textContent = 'Download started.';
         };
 
         // Setup copy button
         copyBtn.onclick = () => {
             navigator.clipboard.writeText(jsonString).then(() => {
-                alert('JSON copied to clipboard!');
-            }).catch () => {
-                errorDiv.textContent = 'Failed to copy JSON.';
+                if (statusMsg) statusMsg.textContent = 'JSON copied to clipboard.';
+            }).catch((err) => {
+                console.error('Copy failed', err);
+                errorDiv.textContent = 'Failed to copy JSON. Your browser may block clipboard access.';
                 errorDiv.classList.remove('hidden');
             });
         };
