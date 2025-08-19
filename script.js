@@ -95,18 +95,34 @@ document.getElementById('csvForm').addEventListener('submit', async (e) => {
         resultDiv.classList.remove('hidden');
         if (statusMsg) statusMsg.textContent = `Converted ${jsonData.length} rows.`;
 
+        // Generate default filename with timestamp
+        const getDefaultFilename = () => {
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            return `converted_${timestamp}.json`;
+        };
+
         // Setup download button
         downloadBtn.onclick = () => {
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'output.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            if (statusMsg) statusMsg.textContent = 'Download started.';
+            // Ask for custom filename
+            const defaultName = getDefaultFilename();
+            const customName = prompt('Enter filename for the JSON file:', defaultName);
+            
+            if (customName) {
+                const filename = customName.endsWith('.json') ? customName : `${customName}.json`;
+                const blob = new Blob([jsonString], { 
+                    type: 'application/json;charset=utf-8'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                if (statusMsg) statusMsg.textContent = `Downloaded as ${filename}`;
+            }
         };
 
         // Setup copy button
