@@ -1,0 +1,18 @@
+/* Additional custom styles to complement Tailwind */
+.container {
+    transition: all 0.3s ease;
+}
+
+#jsonOutput {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+@media (max-width: 640px) {
+    .container {
+        margin: 1rem;
+        padding: 1rem;
+    }
+}
